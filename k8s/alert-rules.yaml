@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  namespace: ecommerce
+data:
+  db-alerts.yml: |
+    groups:
+    - name: database_alerts
+      rules:
+      # Alert: Database down
+      - alert: PostgreSQLDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL database is down"
+          description: "Database {{ $labels.instance }} has been down for more than 1 minute"
+      
+      # Alert: High connection count
+      - alert: PostgreSQLHighConnections
+        expr: pg_stat_activity_count > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL high connection count"
+          description: "Database has {{ $value }} active connections (threshold: 80)"
+      
+      # Alert: Slow queries
+      - alert: PostgreSQLSlowQueries
+        expr: pg_stat_statements_mean_time > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL slow queries detected"
+          description: "Average query time is {{ $value }}ms"
+      
+      # Alert: Disk space running low
+      - alert: PostgreSQLDiskSpaceLow
+        expr: pg_database_size_bytes / pg_settings_max_wal_size > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL disk space low"
+          description: "Database size is 80% of max WAL size"
+      
+      # Alert: Replication lag (if using replicas)
+      - alert: PostgreSQLReplicationLag
+        expr: pg_replication_lag > 30
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL replication lag high"
+          description: "Replication lag is {{ $value }} seconds"

@@ -1,0 +1,187 @@
+name: Database DevOps Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'migrations/**'
+      - 'terraform/**'
+      - 'tests/**'
+      - 'k8s/**'
+  pull_request:
+    branches: [main]
+
+jobs:
+  # Job 1: Validate SQL Migrations
+  validate-migrations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup PostgreSQL
+        uses: ikalnytskyi/action-setup-postgres@v4
+        with:
+          username: ecommerce
+          password: devops123
+          database: ecommerce
+          port: 5432
+      
+      - name: Install Flyway
+        run: |
+          wget -qO- https://repo1.maven.org/maven2/org/flywaydb/flyway-commandline/10.0.0/flyway-commandline-10.0.0-linux-x64.tar.gz | tar xvz
+          sudo ln -s `pwd`/flyway-10.0.0/flyway /usr/local/bin
+      
+      - name: Run Migrations (Test Environment)
+        env:
+          FLYWAY_URL: jdbc:postgresql://localhost:5432/ecommerce
+          FLYWAY_USER: ecommerce
+          FLYWAY_PASSWORD: devops123
+        run: flyway migrate -locations=filesystem:./migrations
+      
+      - name: Test Migration Idempotency
+        run: |
+          echo "Testing idempotency - running migrations again..."
+          flyway migrate || exit 1
+          echo "Migrations are idempotent ✓"
+
+  # Job 2: Schema Tests
+  test-schema:
+    runs-on: ubuntu-latest
+    needs: validate-migrations
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup PostgreSQL
+        uses: ikalnytskyi/action-setup-postgres@v4
+        with:
+          username: ecommerce
+          password: devops123
+          database: ecommerce
+      
+      - name: Run Migrations
+        env:
+          FLYWAY_URL: jdbc:postgresql://localhost:5432/ecommerce
+          FLYWAY_USER: ecommerce
+          FLYWAY_PASSWORD: devops123
+        run: |
+          wget -qO- https://repo1.maven.org/maven2/org/flywaydb/flyway-commandline/10.0.0/flyway-commandline-10.0.0-linux-x64.tar.gz | tar xvz
+          ./flyway-10.0.0/flyway migrate -locations=filesystem:./migrations
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install pytest psycopg2-binary requests
+      
+      - name: Run Schema Tests
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: ecommerce
+          DB_USER: ecommerce
+          DB_PASSWORD: devops123
+        run: pytest tests/test_migrations.py -v
+
+  # Job 3: Terraform Validation
+  terraform-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.0"
+      
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive ./terraform
+      
+      - name: Terraform Init
+        run: terraform -chdir=./terraform init -backend=false
+      
+      - name: Terraform Validate
+        run: terraform -chdir=./terraform validate
+      
+      - name: Terraform Plan (Dry Run)
+        run: terraform -chdir=./terraform plan -input=false
+
+  # Job 4: Integration Tests (Minikube)
+  integration-test:
+    runs-on: ubuntu-latest
+    needs: [validate-migrations, terraform-check]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Start Minikube
+        uses: medyagh/setup-minikube@latest
+        with:
+          minikube-version: 'latest'
+          driver: docker
+      
+      - name: Setup kubectl
+        run: |
+          kubectl config use-context minikube
+          kubectl get nodes
+      
+      - name: Deploy Infrastructure
+        run: |
+          cd terraform
+          terraform init
+          terraform apply -auto-approve
+      
+      - name: Wait for PostgreSQL
+        run: |
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=postgresql -n ecommerce --timeout=120s
+      
+      - name: Run Migrations in Minikube
+        run: |
+          kubectl create configmap db-migrations --from-file=migrations/ -n ecommerce --dry-run=client -o yaml | kubectl apply -f -
+          kubectl apply -f k8s/flyway-job.yaml
+          kubectl wait --for=condition=complete job/db-migration -n ecommerce --timeout=60s
+          kubectl logs job/db-migration -n ecommerce
+      
+      - name: Deploy Application
+        run: |
+          kubectl apply -f k8s/app-deployment.yaml
+          kubectl wait --for=condition=ready pod -l app=ecommerce-api -n ecommerce --timeout=120s
+      
+      - name: Port Forward for Testing
+        run: |
+          kubectl port-forward svc/ecommerce-api 5000:5000 -n ecommerce &
+          sleep 5
+      
+      - name: Run Integration Tests
+        run: |
+          pip install pytest requests psycopg2-binary
+          pytest tests/test_application.py -v
+
+  # Job 5: Deploy to Production (Minikube as "prod")
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [test-schema, integration-test]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Minikube
+        uses: medyagh/setup-minikube@latest
+      
+      - name: Deploy to "Production"
+        run: |
+          cd terraform
+          terraform apply -auto-approve
+          
+          # Run migrations
+          kubectl create configmap db-migrations --from-file=migrations/ -n ecommerce --dry-run=client -o yaml | kubectl apply -f -
+          kubectl apply -f k8s/flyway-job.yaml
+          
+          # Deploy app
+          kubectl apply -f k8s/app-deployment.yaml
+      
+      - name: Verify Deployment
+        run: |
+          kubectl get all -n ecommerce
+          kubectl get jobs -n ecommerce

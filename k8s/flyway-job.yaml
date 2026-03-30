@@ -1,0 +1,36 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-migration
+  namespace: ecommerce
+spec:
+  template:
+    spec:
+      containers:
+      - name: flyway
+        image: flyway/flyway:10-alpine
+        command:
+          - flyway
+          - migrate
+        env:
+        - name: FLYWAY_URL
+          value: "jdbc:postgresql://ecommerce-db-postgresql:5432/ecommerce"
+        - name: FLYWAY_USER
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: username
+        - name: FLYWAY_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: password
+        volumeMounts:
+        - name: migrations
+          mountPath: /flyway/sql
+      volumes:
+      - name: migrations
+        configMap:
+          name: db-migrations
+      restartPolicy: Never
+  backoffLimit: 2

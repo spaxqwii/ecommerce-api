@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ecommerce-api
+  namespace: ecommerce
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ecommerce-api
+  template:
+    metadata:
+      labels:
+        app: ecommerce-api
+    spec:
+      containers:
+      - name: ecommerce-api
+        image: spaxqwii/ecommerce-api:v1.0.0
+        command: ["sh", "-c"]
+        args:
+          - pip install flask psycopg2-binary &&
+            python /app/main.py
+        ports:
+        - containerPort: 5000
+        env:
+        - name: DB_HOST
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: host
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: password
+        
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ecommerce-api
+  namespace: ecommerce
+spec:
+  selector:
+    app: ecommerce-api
+  ports:
+  - port: 5000
+    targetPort: 5000
+  type: NodePort

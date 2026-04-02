@@ -16,24 +16,36 @@ spec:
       containers:
       - name: ecommerce-api
         image: spaxqwii/ecommerce-api:v1.0.0
-        command: ["sh", "-c"]
-        args:
-          - pip install flask psycopg2-binary &&
-            python /app/main.py
+        imagePullPolicy: Always          # ✅ ADD - ensure fresh pulls
+        # ❌ REMOVED: command and args - let image's CMD run
         ports:
         - containerPort: 5000
         env:
         - name: DB_HOST
-          valueFrom:
-            secretKeyRef:
-              name: db-credentials
-              key: host
+          value: "ecommerce-db-postgresql"  # ✅ CHANGED - direct value or fix secret
+        - name: DB_PORT
+          value: "5432"                     # ✅ ADD - missing
+        - name: DB_NAME
+          value: "ecommerce"                # ✅ ADD - missing
+        - name: DB_USER
+          value: "ecommerce"                # ✅ ADD - missing
         - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
               name: db-credentials
-              key: password
-        
+              key: password                 # ✅ OK if secret has this key
+        livenessProbe:                      # ✅ ADD - health checks
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        readinessProbe:                     # ✅ ADD - health checks
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 3
 ---
 apiVersion: v1
 kind: Service
@@ -44,6 +56,6 @@ spec:
   selector:
     app: ecommerce-api
   ports:
-  - port: 5000
-    targetPort: 5000
-  type: NodePort
+  - port: 80          # ✅ CHANGED - standard HTTP port
+    targetPort: 5000  # Container's port
+  type: ClusterIP   # ✅ CHANGED - or NodePort if you need external access

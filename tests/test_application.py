@@ -6,8 +6,9 @@ import requests
 import psycopg2
 import pytest
 import time
+import os
 
-API_URL = "http://localhost:5000"
+API_URL = os.getenv('API_URL', 'http://localhost:8080')  # Changed to 8080 for port-forward
 
 @pytest.fixture(scope="module")
 def wait_for_api():
@@ -33,9 +34,9 @@ def test_create_product(wait_for_api):
         "name": "DevOps T-Shirt",
         "price": 29.99,
         "stock": 50,
-        "sku": "DEV-001"
+        "description": "Test product"  # Changed from sku to match your schema
     }
-    response = requests.post(f"{API_URL}/products", json=payload)
+    response = requests.post(f"{API_URL}/api/products", json=payload)  # Fixed: /api/products
     assert response.status_code == 201
     data = response.json()
     assert data['name'] == payload['name']
@@ -44,11 +45,11 @@ def test_create_product(wait_for_api):
 def test_order_workflow(wait_for_api):
     """Test complete order flow"""
     # Create product first
-    product = requests.post(f"{API_URL}/products", json={
+    product = requests.post(f"{API_URL}/api/products", json={
         "name": "Kubernetes Sticker",
         "price": 5.00,
         "stock": 100,
-        "sku": "K8S-001"
+        "description": "K8s sticker"
     }).json()
     
     # Create order
@@ -58,18 +59,16 @@ def test_order_workflow(wait_for_api):
             {"product_id": product['id'], "quantity": 2}
         ]
     }
-    order = requests.post(f"{API_URL}/orders", json=order_payload).json()
+    order_response = requests.post(f"{API_URL}/api/orders", json=order_payload)  # Fixed: /api/orders
+    assert order_response.status_code == 201
+    order = order_response.json()
     
     assert order['total_amount'] == 10.00  # 2 * $5.00
     assert order['status'] == 'pending'
     
-    # Verify in database
-    conn = psycopg2.connect(
-        host="localhost", port="5432", database="ecommerce",
-        user="ecommerce", password="devops123"
-    )
-    with conn.cursor() as cur:
-        cur.execute("SELECT * FROM orders WHERE id = %s", (order['id'],))
-        db_order = cur.fetchone()
-        assert db_order is not None
-    conn.close()
+    # Verify stock decreased
+    product_check = requests.get(f"{API_URL}/api/products/{product['id']}")
+    assert product_check.json()['stock'] == 98  # 100 - 2
+
+if __name__ == '__main__':
+    pytest.main([__file__, '-v'])

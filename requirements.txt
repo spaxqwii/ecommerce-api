@@ -38,3 +38,4 @@ urllib3==2.6.3
     # via requests
 werkzeug==3.1.6
     # via flask
+prometheus-client==0.17.1

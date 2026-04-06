@@ -12,40 +12,74 @@ spec:
     metadata:
       labels:
         app: ecommerce-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5000"
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
       containers:
       - name: ecommerce-api
-        image: spaxqwii/ecommerce-api:v1.0.0
-        imagePullPolicy: Always          # ✅ ADD - ensure fresh pulls
-        # ❌ REMOVED: command and args - let image's CMD run
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        image: spaxqwii/ecommerce-api:v1.0.5
+        imagePullPolicy: Always
         ports:
         - containerPort: 5000
         env:
         - name: DB_HOST
-          value: "ecommerce-db-postgresql"  # ✅ CHANGED - direct value or fix secret
+          value: "ecommerce-db-postgresql"
         - name: DB_PORT
-          value: "5432"                     # ✅ ADD - missing
+          value: "5432"
         - name: DB_NAME
-          value: "ecommerce"                # ✅ ADD - missing
+          value: "ecommerce"
         - name: DB_USER
-          value: "ecommerce"                # ✅ ADD - missing
+          value: "ecommerce"
         - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
               name: db-credentials
-              key: password                 # ✅ OK if secret has this key
-        livenessProbe:                      # ✅ ADD - health checks
+              key: password
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
           httpGet:
             path: /health
             port: 5000
           initialDelaySeconds: 10
+          periodSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready  # Changed to /ready for clarity
+            port: 5000
+          initialDelaySeconds: 5
           periodSeconds: 5
-        readinessProbe:                     # ✅ ADD - health checks
+          failureThreshold: 2
+        startupProbe:
           httpGet:
             path: /health
             port: 5000
           initialDelaySeconds: 5
-          periodSeconds: 3
+          periodSeconds: 5
+          failureThreshold: 12
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -56,6 +90,6 @@ spec:
   selector:
     app: ecommerce-api
   ports:
-  - port: 80          # ✅ CHANGED - standard HTTP port
-    targetPort: 5000  # Container's port
-  type: ClusterIP   # ✅ CHANGED - or NodePort if you need external access
+  - port: 80
+    targetPort: 5000
+  type: ClusterIP

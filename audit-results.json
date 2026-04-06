@@ -1,0 +1,147 @@
+{
+  "score": 13.5,
+  "total": 20,
+  "percentage": 67.5,
+  "results": [
+    {
+      "category": "Application",
+      "item": "Connection pooling",
+      "status": "FAIL",
+      "message": "No connection pooling detected - add psycopg2.pool",
+      "file_path": ""
+    },
+    {
+      "category": "Application",
+      "item": "No hardcoded secrets",
+      "status": "PASS",
+      "message": "No hardcoded passwords detected",
+      "file_path": ""
+    },
+    {
+      "category": "Application",
+      "item": "Structured logging",
+      "status": "PASS",
+      "message": "Structured logging detected",
+      "file_path": ""
+    },
+    {
+      "category": "Application",
+      "item": "Prometheus metrics",
+      "status": "PASS",
+      "message": "Prometheus metrics endpoint found",
+      "file_path": ""
+    },
+    {
+      "category": "Application",
+      "item": "Rate limiting",
+      "status": "PASS",
+      "message": "Rate limiting detected",
+      "file_path": ""
+    },
+    {
+      "category": "Application",
+      "item": "Health endpoint",
+      "status": "PASS",
+      "message": "/health endpoint found",
+      "file_path": ""
+    },
+    {
+      "category": "Application",
+      "item": "Readiness endpoint",
+      "status": "PASS",
+      "message": "/ready endpoint found",
+      "file_path": ""
+    },
+    {
+      "category": "Kubernetes",
+      "item": "Security contexts",
+      "status": "FAIL",
+      "message": "Add securityContext (runAsNonRoot: true)",
+      "file_path": ""
+    },
+    {
+      "category": "Kubernetes",
+      "item": "Resource limits",
+      "status": "PASS",
+      "message": "Resource limits and requests set",
+      "file_path": ""
+    },
+    {
+      "category": "Kubernetes",
+      "item": "Liveness probe",
+      "status": "PASS",
+      "message": "Liveness probe configured",
+      "file_path": ""
+    },
+    {
+      "category": "Kubernetes",
+      "item": "Readiness probe",
+      "status": "PASS",
+      "message": "Readiness probe configured",
+      "file_path": ""
+    },
+    {
+      "category": "Kubernetes",
+      "item": "Network policies",
+      "status": "WARNING",
+      "message": "Add NetworkPolicy for zero-trust networking",
+      "file_path": ""
+    },
+    {
+      "category": "Kubernetes",
+      "item": "Auto-scaling",
+      "status": "INFO",
+      "message": "Consider adding HorizontalPodAutoscaler",
+      "file_path": ""
+    },
+    {
+      "category": "Security",
+      "item": "Non-root container",
+      "status": "PASS",
+      "message": "Dockerfile uses non-root USER",
+      "file_path": ""
+    },
+    {
+      "category": "Security",
+      "item": ".gitignore",
+      "status": "PASS",
+      "message": ".gitignore properly configured",
+      "file_path": ""
+    },
+    {
+      "category": "Observability",
+      "item": "Metrics endpoint",
+      "status": "PASS",
+      "message": "/metrics endpoint implemented",
+      "file_path": ""
+    },
+    {
+      "category": "Operations",
+      "item": "Makefile",
+      "status": "FAIL",
+      "message": "Create Makefile for common operations",
+      "file_path": ""
+    },
+    {
+      "category": "Operations",
+      "item": "CI/CD",
+      "status": "PASS",
+      "message": "GitHub Actions workflows found",
+      "file_path": ""
+    },
+    {
+      "category": "Documentation",
+      "item": "README.md",
+      "status": "FAIL",
+      "message": "README too short (53 chars)",
+      "file_path": ""
+    },
+    {
+      "category": "Documentation",
+      "item": "Runbook",
+      "status": "INFO",
+      "message": "Consider adding RUNBOOK.md for operations",
+      "file_path": ""
+    }
+  ]
+}

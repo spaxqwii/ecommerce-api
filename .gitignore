@@ -37,3 +37,9 @@ backup-*.sql
 *.tfstate
 *.tfstate.*
 .terraform/
+# Never commit unencrypted secrets
+secret.yaml
+*.secret.yaml
+.env
+.env.*
+*.env
